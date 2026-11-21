@@ -59,3 +59,26 @@ test('public access serves homepage and scan endpoint without credentials',async
     else process.env.ARCHITECT_PUBLIC_ACCESS=prior;
   }
 });
+
+test('tracking query strings do not turn valid page and API routes into 404s',async()=>{
+  const prior=process.env.ARCHITECT_PUBLIC_ACCESS;
+  process.env.ARCHITECT_PUBLIC_ACCESS='true';
+  const server=createAppServer();await new Promise(r=>server.listen(0,'127.0.0.1',r));
+  const base=`http://127.0.0.1:${server.address().port}`;
+  try {
+    let r=await fetch(base+'/?utm_source=chatgpt.com');
+    assert.equal(r.status,200);
+    assert.match(r.headers.get('content-type'),/text\\/html/);
+    r=await fetch(base+'/app.js?v=1');assert.equal(r.status,200);
+    r=await fetch(base+'/style.css?v=1');assert.equal(r.status,200);
+    r=await fetch(base+'/api/health?ping=1');assert.equal(r.status,200);
+    r=await fetch(base+'/api/knowledge?ref=chatgpt');assert.equal(r.status,200);
+    r=await fetch(base+'/api/demo?ref=chatgpt',{method:'POST'});assert.equal(r.status,200);
+    const data=await r.json();assert.ok(data.scanId);
+    r=await fetch(base+'/api/jobs/not-a-real-job?ref=test');assert.equal(r.status,404);
+  } finally {
+    await new Promise(r=>server.close(r));
+    if(prior===undefined)delete process.env.ARCHITECT_PUBLIC_ACCESS;
+    else process.env.ARCHITECT_PUBLIC_ACCESS=prior;
+  }
+});
