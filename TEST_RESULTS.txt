@@ -1,0 +1,152 @@
+
+> code-architect-engine@0.3.0 test
+> node --test tests/*.test.mjs
+
+TAP version 13
+# Subtest: cross-file direct calls and local calls appear in partial call graph
+ok 1 - cross-file direct calls and local calls appear in partial call graph
+  ---
+  duration_ms: 13.928668
+  type: 'test'
+  ...
+# Subtest: knowledge-backed plan supplies alternative designs, invariants and verification
+ok 2 - knowledge-backed plan supplies alternative designs, invariants and verification
+  ---
+  duration_ms: 2.794498
+  type: 'test'
+  ...
+# Subtest: Knip report is normalized to known scanned paths only, and not auto-patched
+ok 3 - Knip report is normalized to known scanned paths only, and not auto-patched
+  ---
+  duration_ms: 0.689048
+  type: 'test'
+  ...
+# Subtest: jscpd and dependency-cruiser normalization preserves review-only status
+ok 4 - jscpd and dependency-cruiser normalization preserves review-only status
+  ---
+  duration_ms: 0.241473
+  type: 'test'
+  ...
+# Subtest: external report merge refreshes planner without manufacturing automatic fixes
+ok 5 - external report merge refreshes planner without manufacturing automatic fixes
+  ---
+  duration_ms: 1.55419
+  type: 'test'
+  ...
+# Subtest: HTTP knowledge and external report import work without executing uploaded project
+ok 6 - HTTP knowledge and external report import work without executing uploaded project
+  ---
+  duration_ms: 65.055622
+  type: 'test'
+  ...
+# Subtest: ZIP creation/reading round-trips binary and text files
+ok 7 - ZIP creation/reading round-trips binary and text files
+  ---
+  duration_ms: 2.510061
+  type: 'test'
+  ...
+# Subtest: invalid ZIP rejected and zipped ../ paths blocked
+ok 8 - invalid ZIP rejected and zipped ../ paths blocked
+  ---
+  duration_ms: 0.47192
+  type: 'test'
+  ...
+# Subtest: finds circular imports, duplicate functions, unreachable files and unused imports
+ok 9 - finds circular imports, duplicate functions, unreachable files and unused imports
+  ---
+  duration_ms: 45.668389
+  type: 'test'
+  ...
+# Subtest: selected fix produces changed archive without mutating original
+ok 10 - selected fix produces changed archive without mutating original
+  ---
+  duration_ms: 3.139568
+  type: 'test'
+  ...
+# Subtest: GitHub input restricts hosts and validates repository references
+ok 11 - GitHub input restricts hosts and validates repository references
+  ---
+  duration_ms: 0.869479
+  type: 'test'
+  ...
+# Subtest: GitHub redirect only accepts approved download domains
+ok 12 - GitHub redirect only accepts approved download domains
+  ---
+  duration_ms: 1.477796
+  type: 'test'
+  ...
+# Subtest: HTTP server demo and repair ZIP flow
+ok 13 - HTTP server demo and repair ZIP flow
+  ---
+  duration_ms: 65.736343
+  type: 'test'
+  ...
+# Subtest: incremental scanner processes 1,220 sources and source over the old 1MB cap
+ok 14 - incremental scanner processes 1,220 sources and source over the old 1MB cap
+  ---
+  duration_ms: 681.557804
+  type: 'test'
+  ...
+# Subtest: deep scanner finds async misuse, empty catches, duplicate logic, cycles, coupling
+ok 15 - deep scanner finds async misuse, empty catches, duplicate logic, cycles, coupling
+  ---
+  duration_ms: 15.756054
+  type: 'test'
+  ...
+# Subtest: archive reader extracts ZIP without 32 MB cap mechanism and avoids symlinks/traversal
+ok 16 - archive reader extracts ZIP without 32 MB cap mechanism and avoids symlinks/traversal
+  ---
+  duration_ms: 22.402709
+  type: 'test'
+  ...
+# Subtest: ZIP server provides background job, progress, full report and conservative patch manifest
+ok 17 - ZIP server provides background job, progress, full report and conservative patch manifest
+  ---
+  duration_ms: 111.662357
+  type: 'test'
+  ...
+# Subtest: streaming GitHub redirect validation rejects other hosts
+ok 18 - streaming GitHub redirect validation rejects other hosts
+  ---
+  duration_ms: 3.960375
+  type: 'test'
+  ...
+# Subtest: streamed archive intake handles ZIP above the previous 32 MiB cap
+ok 19 - streamed archive intake handles ZIP above the previous 32 MiB cap
+  ---
+  duration_ms: 739.395637
+  type: 'test'
+  ...
+# Subtest: ZIP64 end record is accepted without a 16-bit entry count restriction
+ok 20 - ZIP64 end record is accepted without a 16-bit entry count restriction
+  ---
+  duration_ms: 4.221367
+  type: 'test'
+  ...
+# Subtest: streamed extraction rejects archive path traversal and ZIP symlinks
+ok 21 - streamed extraction rejects archive path traversal and ZIP symlinks
+  ---
+  duration_ms: 2.342729
+  type: 'test'
+  ...
+# Subtest: side-effect-only TypeScript import does not crash incremental scanner
+ok 22 - side-effect-only TypeScript import does not crash incremental scanner
+  ---
+  duration_ms: 3.08392
+  type: 'test'
+  ...
+# Subtest: refactor blueprint provides actual file-specific change sets
+ok 23 - refactor blueprint provides actual file-specific change sets
+  ---
+  duration_ms: 3.283115
+  type: 'test'
+  ...
+1..23
+# tests 23
+# suites 0
+# pass 23
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2376.759687

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Code Architect · Structural Intelligence</title>
+  <link rel="stylesheet" href="/style.css" />
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <main class="shell">
+    <header class="header">
+      <div class="brand"><div class="brand-mark">⌘</div><div><strong>CODE ARCHITECT</strong><small>ARCHITECTURAL INTELLIGENCE ENGINE · V0.3</small></div></div>
+      <span class="local-tag">LOCAL ANALYSIS · NO AUTO EXECUTION</span>
+    </header>
+    <section class="hero"><div class="eyebrow">SOFTWARE ARCHITECTURE / DIAGNOSIS / REPAIR</div>
+      <h1>Understand your code.<br /><em>Repair the structure.</em></h1>
+      <p>Upload the entire project or enter a public GitHub repository. The engine maps dependencies, detects duplicated and disconnected code, and creates evidence-based fixes you can review.</p>
+    </section>
+    <section class="intake panel">
+      <div class="panel-title">01 / SOURCE INTAKE <span>CHOOSE ONE INPUT</span></div>
+      <div class="intake-grid"><label class="upload" for="zipInput"><span class="upload-icon">⇧</span><strong>Upload project ZIP</strong><small>Disk-backed scanning · adjustable server storage budget</small><input id="zipInput" type="file" accept=".zip,application/zip" /><span id="fileName">Select a .zip file</span></label>
+      <form id="githubForm" class="github-form"><label for="repo">PUBLIC GITHUB REPOSITORY</label><input id="repo" name="repo" placeholder="owner/repository" autocomplete="off" required /><button type="submit" class="primary">Analyze repository <span>→</span></button><small>No GitHub login required for public repositories</small></form></div>
+      <div class="actions"><button type="button" id="uploadButton" class="primary">Scan selected ZIP →</button><button type="button" id="demoButton" class="secondary">Run built-in demo</button></div>
+      <div id="status" class="status" role="status" aria-live="polite">Ready to analyze. Your code is not executed.</div>
+    </section>
+    <section id="results" class="results hidden">
+      <div class="section-heading"><div class="eyebrow">02 / INTELLIGENCE REPORT</div><h2 id="projectTitle">Project report</h2></div>
+      <div class="metrics"><div class="metric"><b id="filesMetric">—</b><span>SOURCE FILES</span></div><div class="metric"><b id="edgesMetric">—</b><span>DEPENDENCY LINKS</span></div><div class="metric"><b id="findingsMetric">—</b><span>FINDINGS</span></div><div class="metric"><b id="fixMetric">—</b><span>REPAIR CANDIDATES</span></div></div>
+      <div class="toolbar"><label for="severity">FILTER FINDINGS</label><select id="severity"><option value="all">All severities</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select><button id="downloadJson" class="secondary">↓ Report JSON</button><button id="downloadTask" class="secondary">↓ AI repair task</button><button id="downloadPlan" class="secondary">↓ Repair plan JSON</button><button id="downloadBlueprint" class="secondary">↓ Improvement blueprint</button><button id="downloadChangeSets" class="secondary">↓ Target refactoring changes</button></div>
+      <div id="findingsList" class="finding-list"></div>
+      <div class="repair panel"><div class="panel-title">03 / ARCHITECTURE IMPROVEMENT BLUEPRINT <span>MEASURABLE REFACTORING</span></div>
+        <p id="architectureSummary">This section maps hotspots and recommends an ordered migration plan. Static structure alone does not prove runtime speed.</p>
+        <div id="hotspotList" class="plan-list"></div>
+        <div id="waveList" class="plan-list"></div><h3>File-specific restructuring proposals</h3><div id="changeList" class="plan-list"></div>
+      </div>
+      <div class="repair panel"><div class="panel-title">04 / ARCHITECTURAL REPAIR PLAN <span>ALTERNATIVES + VERIFICATION</span></div>
+        <p>The plan is generated using the engineering knowledge base. It provides options, behavior-preservation rules, and tests; it does not claim automated semantic refactoring.</p>
+        <div id="planList" class="plan-list"></div>
+      </div>
+      <div class="repair panel"><div class="panel-title">05 / REVIEWABLE REPAIRS <span>NEVER APPLIED WITHOUT SELECTION</span></div><p>Safe import rewrites can be reviewed and exported as a patch manifest for large projects, or as a patched ZIP for the demo. Review every change, then run your application's own build and tests. Complex refactors remain recommendations for the next-stage AI agent.</p><div id="fixList" class="fix-list"></div><button id="exportFixes" class="primary">↓ Export selected reviewed changes</button></div>
+      <div class="graph panel"><div class="panel-title">06 / DEPENDENCY MAP <span>FIRST 80 LINKS</span></div><div id="graphList"></div></div>
+      <div class="graph panel"><div class="panel-title">07 / FUNCTION-CALL MAP <span>STATIC, PARTIAL</span></div><p class="small-note" id="callGraphSummary"></p><div id="callGraphList"></div></div>
+      <div class="graph panel"><div class="panel-title">08 / EXTERNAL ANALYZER REPORTS <span>JSON ONLY · NO CODE EXECUTION</span></div>
+        <p class="small-note">Optional: generate a Knip, jscpd or dependency-cruiser JSON report in a trusted development environment, then import the report here. The server only parses JSON.</p>
+        <div class="intake-grid"><label class="github-form">REPORT TYPE<select id="externalTool"><option value="knip">Knip</option><option value="jscpd">jscpd</option><option value="dependency-cruiser">Dependency Cruiser</option></select></label><label class="github-form">REPORT JSON FILE<input id="externalFile" type="file" accept=".json,application/json" /></label></div>
+        <button type="button" class="primary" id="importReport">Import external findings</button>
+      </div>
+      <details class="limits"><summary>What this version can and cannot verify</summary><ul id="limitsList"></ul></details>
+    </section>
+    <footer>CODE ARCHITECT · SCAN → EXPLAIN → PATCH → VERIFY <span>Source code is not executed. Scan limits depend on available storage, memory and configurable server safety budgets.</span></footer>
+  </main>
+</body>
+</html>

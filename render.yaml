@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: code-architect-pro
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 22.16.0
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: ARCHITECT_USERNAME
+        value: architect
+      - key: ARCHITECT_PASSWORD
+        sync: false
+      - key: ARCHITECT_MAX_UPLOAD_BYTES
+        value: '25165824'
+      - key: ARCHITECT_MAX_EXPANDED_BYTES
+        value: '134217728'
+      - key: ARCHITECT_CONCURRENT_SCANS
+        value: '1'
+      - key: ARCHITECT_MAX_ANALYZER_REPORT_BYTES
+        value: '8388608'

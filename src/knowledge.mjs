@@ -1,0 +1,157 @@
+/**
+ * Code Architect engineering knowledge base, v0.2.
+ * These are decision rules / hypotheses, not a guarantee that a refactor is safe.
+ * The agent must establish evidence and verify behavior before deployment.
+ */
+export const KNOWLEDGE = Object.freeze({
+  'circular-dependency': {
+    discipline: 'Modularity / dependency direction', priority: 'high',
+    question: 'Which dependency is an implementation detail that can be inverted or extracted?',
+    strategies: [
+      { id: 'shared-kernel', name: 'Extract a cohesive shared module', useWhen: 'Both modules need pure shared types, data, or utilities.', avoidWhen: 'The extracted module would become a dumping ground or introduce global state.', steps: ['Locate the cycle and every import edge.', 'Identify the smallest shared responsibility.', 'Extract only that responsibility.', 'Update both import paths.'] },
+      { id: 'invert-dependency', name: 'Invert through an interface or callback', useWhen: 'A low-level module calls back into a higher-level module.', avoidWhen: 'The interface would hide a simpler legitimate dependency.', steps: ['Map ownership and caller contracts.', 'Introduce a narrow interface owned by the consumer.', 'Inject the implementation at the composition root.', 'Delete the backwards import.'] }
+    ],
+    invariants: ['Public module exports preserve contracts.', 'Initialization order and side effects remain valid.'],
+    verification: ['Type-check affected modules.', 'Run integration tests covering both directions.', 'Rescan to confirm the cycle is gone.'],
+    never: ['Move code solely to silence the detector.', 'Add a global service locator as a shortcut.']
+  },
+  'duplicate-function-body': {
+    discipline: 'DRY / semantic cohesion', priority: 'medium',
+    question: 'Are the contracts, edge cases, side effects, and ownership actually equivalent?',
+    strategies: [
+      { id: 'extract-shared', name: 'Extract shared pure implementation', useWhen: 'The routines perform genuinely identical stable domain logic.', avoidWhen: 'They only happen to look alike but have separate business meanings.', steps: ['Compare tests, side effects, and call contexts.', 'Select one owning module.', 'Extract a named, testable function.', 'Route existing callers through it.'] },
+      { id: 'retain-separate', name: 'Retain deliberate duplication', useWhen: 'The code is likely to diverge due to different domain ownership.', avoidWhen: 'Identical bug fixes must be applied repeatedly.', steps: ['Document why the implementations differ in contract.', 'Create regression tests for each implementation.'] }
+    ],
+    invariants: ['No changed returned values or exception behavior.', 'No changed logging or side-effect ordering.'],
+    verification: ['Golden-master tests on representative and edge inputs.', 'Run all known callers.', 'Compare before/after behavior.'],
+    never: ['Merge functions based on textual similarity alone.']
+  },
+  'unreachable-from-known-entrypoints': {
+    discipline: 'Reachability / plugin awareness', priority: 'low',
+    question: 'Is this file loaded by framework conventions, runtime imports, a CLI, a job, reflection, or an external API?',
+    strategies: [
+      { id: 'confirm-entrypoints', name: 'Trace runtime and framework registration', useWhen: 'Static import graph reports no path.', avoidWhen: 'Deleting code before checking dynamic registration.', steps: ['Inventory application, worker, CLI, test, and route entrypoints.', 'Search dynamic imports and config-driven registration.', 'Add a test or trace for actual loading.', 'Remove only when unused is confirmed.'] }
+    ],
+    invariants: ['All routes, background jobs, and plugin registrations remain available.'],
+    verification: ['Run route and worker smoke tests.', 'Check startup and runtime registrations.'],
+    never: ['Delete modules solely because a heuristic marks them unreachable.']
+  },
+  'unused-named-import': {
+    discipline: 'Safe cleanup', priority: 'low',
+    question: 'Does the import affect type augmentation, execution side effects, or build transforms?',
+    strategies: [
+      { id: 'remove-binding', name: 'Remove the unused named binding only', useWhen: 'A symbol is not referenced and the import statement remains if necessary.', avoidWhen: 'A compiler transform or macro consumes the binding.', steps: ['Check all symbol usages and special transforms.', 'Delete only unused named specifiers.', 'Inspect the generated diff.'] }
+    ],
+    invariants: ['Module evaluation and side effects are unchanged.'],
+    verification: ['Type-check and lint.', 'Run module import smoke tests.'],
+    never: ['Remove side-effect imports without separate proof.']
+  },
+  'large-module': {
+    discipline: 'Single responsibility / cohesion', priority: 'low',
+    question: 'Which responsibilities change independently, and what shared state binds them?',
+    strategies: [
+      { id: 'extract-cohesive-modules', name: 'Separate cohesive responsibilities', useWhen: 'Independent functional areas are interleaved.', avoidWhen: 'The only issue is a large line count.', steps: ['Identify domain boundaries and external consumers.', 'Extract one cohesive feature at a time.', 'Keep one clear public facade if needed.', 'Avoid circular dependencies.'] }
+    ],
+    invariants: ['External API and data ownership remain explicit.'],
+    verification: ['Run type-check, tests, build, and API contract checks.'],
+    never: ['Split by arbitrary line count.', 'Create extra layers without an architectural need.']
+  },
+  'fetch-in-loop': {
+    discipline: 'Performance / async control', priority: 'medium',
+    question: 'Does the endpoint allow batching or concurrency, and are order, rate limits, and retries significant?',
+    strategies: [
+      { id: 'bounded-concurrency', name: 'Bound concurrent requests', useWhen: 'Calls are independent and the API supports concurrent requests.', avoidWhen: 'Requests depend on prior results or require strict ordering.', steps: ['Measure actual latency and rate limits.', 'Preserve request ordering where required.', 'Add configurable concurrency caps.', 'Preserve error handling and retries.'] },
+      { id: 'batching', name: 'Use a supported batch API', useWhen: 'The remote service supports equivalent batch semantics.', avoidWhen: 'The batched endpoint differs in behavior or cost.', steps: ['Confirm API semantics and limits.', 'Convert serial calls into a batch.', 'Compare full response shape and errors.'] }
+    ],
+    invariants: ['No dropped requests, changed output order, or unsafe retry behavior.'],
+    verification: ['Profile before and after using the same workload.', 'Test partial failures, throttling, and timeouts.'],
+    never: ['Replace all loops with Promise.all without a concurrency limit.']
+  },
+  'unresolved-local-import': {
+    discipline: 'Module resolution / build consistency', priority: 'medium',
+    question: 'Does the target exist under a configured alias, generated-file pipeline, or framework resolver?',
+    strategies: [
+      { id: 'resolve-target', name: 'Reconcile import with actual target and config', useWhen: 'Static resolver cannot locate target.', avoidWhen: 'The target is generated dynamically during a valid build.', steps: ['Read tsconfig, package exports, and framework aliases.', 'Trace generated files and case-sensitive paths.', 'Correct only a verified bad path or configuration.'] }
+    ],
+    invariants: ['Module imports resolve in development and production.'],
+    verification: ['Type-check and run a production build.'],
+    never: ['Create stub files just to hide a missing import warning.']
+  },
+  'syntax-error': {
+    discipline: 'Compilation correctness', priority: 'high',
+    question: 'What was the intended syntax and what other expressions depend on it?',
+    strategies: [ { id: 'local-syntax-repair', name: 'Repair minimal invalid syntax', useWhen: 'Parser reports a concrete error.', avoidWhen: 'Changing program behavior to silence the parser.', steps: ['Examine the surrounding syntax and compiler settings.', 'Apply the smallest correction.', 'Verify resulting AST and type-check.'] } ],
+    invariants: ['Existing intended control flow is preserved.'], verification: ['Parse and type-check.', 'Run tests.'], never: ['Guess at missing code without context.']
+  },
+  'invalid-package-json': {
+    discipline: 'Manifest integrity', priority: 'high', question: 'Which JSON syntax is invalid without changing the package metadata?',
+    strategies: [ { id: 'correct-json', name: 'Correct JSON syntax only', useWhen: 'A manifest cannot be parsed.', avoidWhen: 'Changing dependency versions is not necessary.', steps: ['Locate syntax error.', 'Repair braces, quoting, or commas.', 'Parse as JSON and compare manifest entries.'] } ],
+    invariants: ['Dependencies and scripts are unchanged unless explicitly approved.'], verification: ['Parse JSON.', 'Validate package manager metadata.'], never: ['Upgrade packages during syntax repair.']
+  },
+  'async-foreach': {
+    discipline:'Async control flow and correctness', priority:'high',
+    question:'Is completion ordering important, and are errors awaited and handled?',
+    strategies:[{id:'sequential-await',name:'Replace with sequential for...of',useWhen:'Order, backpressure or dependent steps matter.',avoidWhen:'Work is independent and safe parallelism is desirable.',steps:['Capture baseline async/error behavior.','Replace forEach(async) with for...of and await.','Test failed and slow requests and cancellation.']},{id:'bounded-parallel',name:'Use bounded async worker pool',useWhen:'Work is independent but must not overload resources.',avoidWhen:'Ordering or transactional semantics require sequential operations.',steps:['Measure rate limits and concurrency.','Introduce explicit concurrency configuration.','Aggregate failures and preserve output ordering if required.']}],
+    invariants:['All promises are accounted for and rejections handled.','No unintended output order or rate-limit changes.'],verification:['Test slow, failed and concurrent operations.','Compare completed results and error behavior.'],never:['Replace with unbounded Promise.all automatically.']
+  },
+  'empty-catch': {
+    discipline:'Reliability and observable failures', priority:'medium',
+    question:'Is the exception intentionally ignorable, and how can failures be surfaced without changing control flow?',
+    strategies:[{id:'handle-errors',name:'Add domain-aware failure handling',useWhen:'Errors are being silently swallowed.',avoidWhen:'An intentionally ignored optional operation is documented and harmless.',steps:['Identify operations that throw.','Define recovery, telemetry or explicit ignore policy.','Test failure paths and propagated errors.']}],
+    invariants:['Error semantics and user-visible outcomes are intentional.'],verification:['Inject failures and verify expected errors/recoveries.'],never:['Blindly rethrow every exception without understanding behavior.']
+  },
+  'high-coupling-hub': {
+    discipline:'Change propagation and service boundaries', priority:'medium',
+    question:'Is this module a stable contract, legitimate shared kernel, or an overloaded service?',
+    strategies:[{id:'stable-facade',name:'Extract internal responsibilities behind a stable facade',useWhen:'Many consumers import unrelated responsibilities from one module.',avoidWhen:'The module is already a cohesive, deliberately stable domain API.',steps:['Inventory dependent modules and exported contracts.','Separate cohesive responsibilities into internal modules.','Retain facade exports for backward compatibility.','Migrate one caller cluster at a time.']}],
+    invariants:['Public API compatibility preserved.','No new circular dependencies introduced.'],verification:['Run contract tests for dependent modules.','Compare fan-in/out and build/runtime benchmarks.'],never:['Split solely because a module has many dependents.']
+  },
+  'excessive-fan-out': {
+    discipline:'Coupling and subsystem ownership', priority:'medium',
+    question:'Why does this module import so many independent systems, and what responsibilities should be composed at the boundary?',
+    strategies:[{id:'orchestration-boundary',name:'Separate coordinator from domain implementation',useWhen:'Domain logic mixes infrastructure, I/O and presentation imports.',avoidWhen:'This is a legitimate composition root that wires dependencies by design.',steps:['Classify each dependency by layer and ownership.','Extract coherent calculation or domain logic.','Keep orchestration at one application boundary.','Rescan and run integration tests.']}],
+    invariants:['Execution order and data contracts unchanged.'],verification:['Check critical workflows and import graph.','Measure startup and memory before claiming improvements.'],never:['Introduce abstraction layers without a concrete coupling problem.']
+  },
+  'oversize-source': {
+    discipline: 'Tooling limits / module ownership', priority: 'medium', question: 'Is this generated code, a vendored artifact, or a real hand-maintained module?',
+    strategies: [ { id: 'classify-source', name: 'Classify before splitting', useWhen: 'Source is too large for scanner.', avoidWhen: 'Generated bundles should simply be excluded from handwritten code analysis.', steps: ['Identify source ownership.', 'Exclude generated artifacts appropriately.', 'If handwritten, consider cohesive extraction after tests.'] } ],
+    invariants: ['Generated code and runtime artifacts remain reproducible.'], verification: ['Build and compare generated outputs.'], never: ['Refactor generated files manually.']
+  }
+});
+
+export function listKnowledge() {
+  return Object.entries(KNOWLEDGE).map(([rule, value]) => ({ rule, ...value }));
+}
+
+export function makeRepairPlan(report) {
+  if (!report || !Array.isArray(report.findings)) throw new Error('Invalid scan report');
+  const steps = report.findings.map((finding, i) => {
+    const guide = KNOWLEDGE[finding.rule];
+    return {
+      id: `plan-${i + 1}`,
+      findingId: finding.id,
+      title: finding.title,
+      file: finding.location.file,
+      line: finding.location.line,
+      severity: finding.severity,
+      confidence: finding.confidence,
+      status: 'proposed-needs-validation',
+      discipline: guide?.discipline || 'General engineering review',
+      decisionQuestion: guide?.question || 'Is the finding confirmed in runtime and project context?',
+      options: guide?.strategies || [{ id: 'manual-investigation', name: 'Investigate first', useWhen: 'Tool evidence is incomplete.', avoidWhen: 'A fix would be speculative.', steps: ['Gather source and runtime evidence.', 'Select the smallest viable change.'] }],
+      invariants: guide?.invariants || ['Preserve documented intended behavior.'],
+      verification: guide?.verification || ['Type-check, run tests and build.'],
+      never: guide?.never || ['Apply unreviewed speculative edits.'],
+      evidence: finding.evidence || [finding.location],
+      automaticPatch: !!finding.fixId,
+    };
+  });
+  return {
+    version: '0.3', mode: 'repair',
+    objective: 'Repair or improve internal structure while preserving intended behavior; do not add features.',
+    acceptanceGate: ['Confirm finding against actual source and use sites.', 'Document behavior and interfaces to preserve.', 'Choose an architecture alternative with justification.', 'Prepare diff on isolated copy or branch.', 'Run baseline and changed-project checks.', 'Compare outputs, failures, and performance only where measured.', 'Require human approval for all semantic changes.'],
+    enhancementMode: { enabled: false, rule: 'Feature changes require separate explicit user request, requirements, new tests and review.' },
+    warnings: ['Plans derive from static evidence and do not prove a change is correct.', 'Uploaded or cloned projects are untrusted and must not be executed by the scanner server.'],
+    steps
+  };
+}

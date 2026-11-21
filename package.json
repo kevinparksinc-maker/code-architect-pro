@@ -1,0 +1,22 @@
+{
+  "name": "code-architect-engine",
+  "version": "0.3.1",
+  "private": true,
+  "description": "Disk-backed scalable JS/TS code architect: ZIP64/GitHub intake, architectural evidence, refactoring blueprints, reviewable patches, and trusted verification helpers",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/server.mjs",
+    "scan": "node src/cli.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "dev": "node src/server.mjs",
+    "compare": "node scripts/compare-architecture.mjs"
+  },
+  "dependencies": {
+    "typescript": "5.8.3"
+  },
+  "optionalDependencies": {},
+  "license": "MIT"
+}
