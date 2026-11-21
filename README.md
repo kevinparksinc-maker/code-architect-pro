@@ -81,12 +81,12 @@ Benchmarks only run if your trusted project has a `bench` or `benchmark` npm scr
 
 The original v0.3 browser scanner has been hardened for deployment in **v0.3.1**:
 
-- **HTTP Basic authentication** protects the dashboard, uploads, report retrieval, and API routes. The public health endpoint stays available for Render.
-- Binding to a public host fails at startup unless `ARCHITECT_USERNAME` and `ARCHITECT_PASSWORD` (at least 16 characters) are set. Never put the password in GitHub.
+- **No-login public mode** (`ARCHITECT_PUBLIC_ACCESS=true`) lets anyone use the dashboard and scanning endpoints. HTTP Basic authentication remains optional if public mode is disabled.
+- Public binding requires either an explicit `ARCHITECT_PUBLIC_ACCESS=true` or configured username/password. Keep API keys and passwords off GitHub.
 - Temporary scan directories are pruned periodically. Archive size, expanded size and concurrency are configurable for the actual host capacity.
 - Run `npm test` before deploying. The ready-to-use Render Blueprint is `render.yaml`; the step-by-step instructions are `DEPLOYMENT.md`.
-- This is **single-operator protection**, not multi-tenant security. Uploaded source remains private only to operators who have the login and server access. The app does not execute imported source during static scans.
+- **Warning:** No-login mode is a public scanner. Anyone can submit code, scan resources are shared, and anyone with a report URL can read that report. Don't upload sensitive code. Uploaded source is not executed during static scans.
 
-On local loopback with no `ARCHITECT_USERNAME` or `ARCHITECT_PASSWORD` configured, the application continues to support unauthenticated development; do not expose that mode publicly.
+Unauthenticated local loopback development remains supported. Internet-facing no-login mode requires setting `ARCHITECT_PUBLIC_ACCESS=true` explicitly.
 
 MIT license for this application code; third-party tools and hosted models have their own terms and costs.
