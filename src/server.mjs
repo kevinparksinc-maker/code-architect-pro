@@ -98,21 +98,23 @@ function safeJson(body) { try { return JSON.parse(body.toString('utf8')); } catc
 export function createAppServer() {
   const app = http.createServer(async (req, res) => {
     try {
-      if (req.method === 'GET' && (req.url === '/api/health' || req.url === '/healthz')) {
+      // Route by URL pathname so tracking and cache-busting query strings do not break pages or API calls.
+      const pathname = new URL(req.url, 'http://localhost').pathname;
+      if (req.method === 'GET' && (pathname === '/api/health' || pathname === '/healthz')) {
         json(res, 200, {status:'ok', version:'0.3.1'}); return;
       }
       if (!authorized(req)) {
         res.writeHead(401, headers({ 'Content-Type': 'application/json; charset=utf-8', 'WWW-Authenticate': 'Basic realm="Code Architect", charset="UTF-8"' }));
         res.end(JSON.stringify({error:'Authentication required'})); return;
       }
-      if (req.method === 'GET' && STATIC[req.url]) {
-        const [name, type] = STATIC[req.url];
+      if (req.method === 'GET' && STATIC[pathname]) {
+        const [name, type] = STATIC[pathname];
         const file = await readFile(path.join(ROOT, name));
         res.writeHead(200, headers({ 'Content-Type': type })); res.end(file); return;
       }
 
-      if (req.method === 'GET' && req.url.startsWith('/api/jobs/')) {
-        const parts=req.url.split('?')[0].split('/');const job=jobs.get(parts[3]);
+      if (req.method === 'GET' && pathname.startsWith('/api/jobs/')) {
+        const parts=pathname.split('/');const job=jobs.get(parts[3]);
         if(!job)return json(res,404,{error:'Scan job not found or expired'});
         if(parts[4]==='report') {
           if(job.status!=='complete')return json(res,409,{error:'Full report not ready yet'});
@@ -123,19 +125,19 @@ export function createAppServer() {
           ...(job.status==='complete'?{report:job.report,fullReportUrl:`/api/jobs/${job.id}/report`}:{}),
           ...(job.error?{error:job.error}: {})});
       }
-      if (req.method === 'GET' && req.url === '/api/knowledge') { json(res, 200, {catalog: listKnowledge(), version: '0.3'}); return; }
-      if (req.method === 'POST' && req.url === '/api/demo') {
+      if (req.method === 'GET' && pathname === '/api/knowledge') { json(res, 200, {catalog: listKnowledge(), version: '0.3'}); return; }
+      if (req.method === 'POST' && pathname === '/api/demo') {
         const files = await loadFolder(path.join(ROOT, 'examples/demo'));
         json(res, 200, createSession(scanFiles(files, 'Built-in demonstration'), files)); return;
       }
-      if (req.method === 'POST' && req.url === '/api/scan/zip') {
+      if (req.method === 'POST' && pathname === '/api/scan/zip') {
         if ((req.headers['content-type'] || '').split(';')[0] !== 'application/zip') return json(res, 415, { error: 'Send ZIP bytes with Content-Type: application/zip' });
         const workdir=await mkdtemp(path.join(tmpdir(),'architect-web-')),archive=path.join(workdir,'source.zip');
         try {await streamUpload(req,archive);json(res,202,newJob(workdir,archive));}
         catch(e){await rm(workdir,{recursive:true,force:true});throw e;}
         return;
       }
-      if (req.method === 'POST' && req.url === '/api/scan/github') {
+      if (req.method === 'POST' && pathname === '/api/scan/github') {
         const body=safeJson(await readBody(req,4000));
         // Validate repository synchronously, before starting asynchronous download.
         parseRepo(body.repository);
@@ -144,7 +146,7 @@ export function createAppServer() {
         catch(e){await rm(workdir,{recursive:true,force:true});throw e;}
         return;
       }
-      if (req.method === 'POST' && req.url === '/api/analyzers/import') {
+      if (req.method === 'POST' && pathname === '/api/analyzers/import') {
         const body = safeJson(await readBody(req, MAX_ANALYZER_REPORT_BYTES));
         const session = sessions.get(body.scanId);
         if (!session || Date.now() - session.createdAt > (session.workdir?60:30) * 60000) return json(res, 404, { error: 'Scan session expired; scan again' });
@@ -155,7 +157,7 @@ export function createAppServer() {
         if(session.workdir){await writeFile(path.join(session.workdir,'report.json'),JSON.stringify(session.report));const job=jobs.get(body.scanId);if(job)job.report=reportPreview(session.report);}
         json(res, 200, {scanId: body.scanId,report:session.workdir?reportPreview(session.report):session.report,...(session.workdir?{fullReportUrl:`/api/jobs/${body.scanId}/report`}:{})}); return;
       }
-      if (req.method === 'POST' && req.url === '/api/export/patch-manifest') {
+      if (req.method === 'POST' && pathname === '/api/export/patch-manifest') {
         const body=safeJson(await readBody(req,300000));const session=sessions.get(body.scanId);
         if(!session)return json(res,404,{error:'Scan session expired'});
         if(!Array.isArray(body.fixIds)||!body.fixIds.length||new Set(body.fixIds).size!==body.fixIds.length)return json(res,400,{error:'Select unique fix IDs'});
@@ -163,7 +165,7 @@ export function createAppServer() {
         json(res,200,{format:'code-architect-reviewed-patches',version:'0.3',patches,verificationRequired:true,
           instructions:'Use scripts/apply-reviewed-fixes.mjs on your own extracted project copy; then run regression tests.'});return;
       }
-      if (req.method === 'POST' && req.url === '/api/export/repaired-zip') {
+      if (req.method === 'POST' && pathname === '/api/export/repaired-zip') {
         const body = safeJson(await readBody(req, 200000));
         const session = sessions.get(body.scanId);
         if (!session || Date.now() - session.createdAt > 30 * 60000) return json(res, 404, { error: 'Scan session expired; scan the project again' });
