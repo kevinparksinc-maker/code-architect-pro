@@ -14,10 +14,8 @@ services:
         value: production
       - key: HOST
         value: 0.0.0.0
-      - key: ARCHITECT_USERNAME
-        value: architect
-      - key: ARCHITECT_PASSWORD
-        sync: false
+      - key: ARCHITECT_PUBLIC_ACCESS
+        value: 'true'
       - key: ARCHITECT_MAX_UPLOAD_BYTES
         value: '25165824'
       - key: ARCHITECT_MAX_EXPANDED_BYTES
