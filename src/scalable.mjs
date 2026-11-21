@@ -11,20 +11,14 @@ import {makeRepairPlan} from './knowledge.mjs';
 import {analyzeArchitecture} from './insight.mjs';
 import {buildRefactorBlueprint} from './refactor-blueprint.mjs';
 import {buildAgentTask} from './engine.mjs';
+import {createProjectResolver} from './project-resolution.mjs';
 const SOURCE=/\.(?:[cm]?ts|[cm]?js|tsx|jsx)$/i;
 const EXCLUDE=new Set(['node_modules','.git','.next','.turbo','.cache','dist','build','coverage','vendor','out']);
-const EXT=['.ts','.tsx','.js','.jsx','.mjs','.cjs','.mts','.cts'];
 const hash=s=>createHash('sha256').update(s).digest('hex');
 const lineno=(sf,n)=>sf.getLineAndCharacterOfPosition(n.getStart(sf)).line+1;
 const kind=name=>name.endsWith('.tsx')?ts.ScriptKind.TSX:name.endsWith('.jsx')?ts.ScriptKind.JSX:/\.[cm]?js$/.test(name)?ts.ScriptKind.JS:ts.ScriptKind.TS;
 const normalize=s=>s.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g,'').replace(/\s+/g,' ').trim();
 const findName=n=>ts.isIdentifier(n)?n.text:null;
-function resolve(from,spec,names) {
-  if (!spec.startsWith('.')) return null;
-  const base=posix.normalize(posix.join(posix.dirname(from),spec));
-  if (base.startsWith('../')||base.startsWith('/')) return null;
-  return [base,...EXT.map(e=>base+e),...EXT.map(e=>posix.join(base,'index'+e))].find(x=>names.has(x))||null;
-}
 async function* walk(root, relative='') {
   for (const item of await readdir(path.join(root,relative),{withFileTypes:true})) {
     if (EXCLUDE.has(item.name)) continue;
@@ -52,20 +46,45 @@ function components(graph) {
   return groups;
 }
 function collectImports(sf) {
-  const imports=new Map(), specs=new Set();
-  const namespaces=new Map();
-  for(const s of sf.statements){
-    if(ts.isImportDeclaration(s)&&ts.isStringLiteral(s.moduleSpecifier)) {
-      const spec=s.moduleSpecifier.text;specs.add(spec);
-      if(s.importClause?.name)imports.set(s.importClause.name.text,{spec,original:'default'});
-      if(s.importClause?.namedBindings&&ts.isNamedImports(s.importClause.namedBindings))for(const n of s.importClause.namedBindings.elements)imports.set(n.name.text,{spec,original:n.propertyName?.text||n.name.text});
-      if(s.importClause?.namedBindings&&ts.isNamespaceImport(s.importClause.namedBindings))namespaces.set(s.importClause.namedBindings.name.text,spec);
+  const imports = new Map(), namespaces = new Map(), specs = [];
+  const add = (specifier, kind, node) => specs.push({specifier, kind, line:lineno(sf,node)});
+  for (const node of sf.statements) {
+    if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
+      const spec = node.moduleSpecifier.text;
+      const clause = node.importClause;
+      const bindings = clause?.namedBindings;
+      const allInlineTypes = !clause?.name && bindings && ts.isNamedImports(bindings) &&
+        bindings.elements.length > 0 && bindings.elements.every(binding=>binding.isTypeOnly);
+      add(spec, clause?.isTypeOnly ? 'type' : allInlineTypes ? 'inline-type' : 'runtime', node);
+      if (clause?.isTypeOnly) continue;
+      if (clause?.name) imports.set(clause.name.text,{spec,original:'default'});
+      if (bindings && ts.isNamedImports(bindings)) {
+        for (const binding of bindings.elements) {
+          if (!binding.isTypeOnly) imports.set(binding.name.text,{spec,original:binding.propertyName?.text ?? binding.name.text});
+        }
+      }
+      if (bindings && ts.isNamespaceImport(bindings)) namespaces.set(bindings.name.text,spec);
     }
-    if(ts.isExportDeclaration(s)&&s.moduleSpecifier&&ts.isStringLiteral(s.moduleSpecifier))specs.add(s.moduleSpecifier.text);
+    if (ts.isExportDeclaration(node) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) {
+      const clause = node.exportClause;
+      const inlineTypes = clause && ts.isNamedExports(clause) && clause.elements.length > 0 &&
+        clause.elements.every(binding=>binding.isTypeOnly);
+      add(node.moduleSpecifier.text, node.isTypeOnly ? 'type' : inlineTypes ? 'inline-type' : 'runtime', node);
+    }
+    if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference) &&
+      node.moduleReference.expression && ts.isStringLiteral(node.moduleReference.expression)) {
+      add(node.moduleReference.expression.text,node.isTypeOnly ? 'type' : 'runtime',node);
+    }
   }
-  function visit(n){
-    if(ts.isCallExpression(n)&&n.arguments.length===1&&ts.isStringLiteral(n.arguments[0])&&(n.expression.kind===ts.SyntaxKind.ImportKeyword||findName(n.expression)==='require'))specs.add(n.arguments[0].text);
-    ts.forEachChild(n,visit);
+  function visit(node) {
+    if (ts.isCallExpression(node) && node.arguments.length && ts.isStringLiteralLike(node.arguments[0])) {
+      if (node.expression.kind===ts.SyntaxKind.ImportKeyword) add(node.arguments[0].text,'dynamic',node);
+      if (findName(node.expression)==='require') add(node.arguments[0].text,'runtime',node);
+    }
+    if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument) && ts.isStringLiteral(node.argument.literal)) {
+      add(node.argument.literal.text,'type',node);
+    }
+    ts.forEachChild(node,visit);
   }
   visit(sf);
   return {imports,namespaces,specs};
@@ -84,6 +103,9 @@ export async function scanLargeDirectory(directory, options={}) {
   const sources=[],allNames=new Set();let totalFiles=0;
   for await (const file of walk(root)){ totalFiles++;allNames.add(file);if(SOURCE.test(file))sources.push(file); }
   const sourceSet=new Set(sources), graph=new Map(sources.map(f=>[f,new Set()]));
+  const resolver = createProjectResolver(root,allNames,sourceSet);
+  const eager = new Map(sources.map(file=>[file,new Set()]));
+  const staticDependencies = new Map(sources.map(file=>[file,new Set()]));
   const findings=[],fixes=[],references=[],fnGroups=new Map(),moduleInfo=new Map(),pendingCalls=[];
   const callNodes=[],callEdges=[],unresolved=[];
   let parseErrors=0,processedBytes=0, externals=new Set();
@@ -122,12 +144,23 @@ export async function scanLargeDirectory(directory, options={}) {
     }
     visit(sf);
     moduleInfo.set(file,{functions});
-    for(const spec of specs){if(spec.startsWith('.')){
-      const to=resolve(file,spec,sourceSet);
-      references.push({from:file,specifier:spec,to});
-      if(to)graph.get(file).add(to);
-      else if(!allNames.has(posix.normalize(posix.join(posix.dirname(file),spec))))findings.push(newFinding('unresolved-local-import','medium','medium',file,1,`Unresolved import: ${spec}`,`No local source target identified for '${spec}' (could be generated or an asset).`,'Inspect aliases and generated sources before editing.'));
-    }else if(!spec.startsWith('node:'))externals.add(spec);}
+    for (const {specifier,kind:declaredKind,line} of specs) {
+      const {target:to,local,asset,verbatim} = resolver.resolve(file,specifier);
+      const kind = /\.d\.[cm]?ts$/i.test(file) || /\.d\.[cm]?ts$/i.test(to ?? '') ? 'type' : declaredKind === 'inline-type' ? (verbatim ? 'runtime' : 'type') : declaredKind;
+      if (!local) {
+        if (!specifier.startsWith('node:')) externals.add(specifier);
+        continue;
+      }
+      if (to || !asset) references.push({from:file,specifier,to,kind,line});
+      if (to) {
+        graph.get(file).add(to);
+        if (kind !== 'dynamic') staticDependencies.get(file).add(to);
+        if (kind === 'runtime') eager.get(file).add(to);
+      } else if (!asset) {
+        findings.push(newFinding('unresolved-local-import','medium','medium',file,line,
+          `Unresolved import: ${specifier}`,'No indexed source target identified.','Inspect aliases, generated sources and framework resolution before editing.'));
+      }
+    }
     for(const statement of sf.statements){
       if(!ts.isImportDeclaration(statement)||!statement.importClause||statement.importClause.name||statement.attributes||statement.assertClause)continue;
       const clause=statement.importClause,b=clause.namedBindings;
@@ -148,8 +181,8 @@ export async function scanLargeDirectory(directory, options={}) {
   const ids=new Set(callNodes.map(n=>n.id));
   for(const [file,meta] of moduleInfo)for(const [symbol,info] of meta.functions){const node={id:`${file}::${symbol}`,file,symbol,line:info.line,kind:'function'};callNodes.push(node);ids.add(node.id);}
   for(const c of pendingCalls){let target=null,resolution=null;
-    if(c.imported){const mod=resolve(c.file,c.imported.spec,sourceSet);if(mod&&moduleInfo.get(mod)?.functions.has(c.imported.original)){target=`${mod}::${c.imported.original}`;resolution='static-import';}}
-    else if(c.namespace){const mod=resolve(c.file,c.namespace,sourceSet);if(mod&&moduleInfo.get(mod)?.functions.has(c.member)){target=`${mod}::${c.member}`;resolution='static-namespace-import';}}
+    if(c.imported){const mod=resolver.resolve(c.file,c.imported.spec).target;if(mod&&moduleInfo.get(mod)?.functions.has(c.imported.original)){target=`${mod}::${c.imported.original}`;resolution='static-import';}}
+    else if(c.namespace){const mod=resolver.resolve(c.file,c.namespace).target;if(mod&&moduleInfo.get(mod)?.functions.has(c.member)){target=`${mod}::${c.member}`;resolution='static-namespace-import';}}
     else if(moduleInfo.get(c.file)?.functions.has(c.local)){target=`${c.file}::${c.local}`;resolution='same-module';}
     if(target){const from=ids.has(`${c.file}::${c.caller}`)?`${c.file}::${c.caller}`:`${c.file}::<module>`;callEdges.push({from,to:target,file:c.file,line:c.line,resolution,confidence:'medium'});}
     else unresolved.push({file:c.file,line:c.line,reason:'Static function target not found.',expression:c.local||c.member});
@@ -160,12 +193,22 @@ export async function scanLargeDirectory(directory, options={}) {
     if(fanIn>=10)findings.push(newFinding('high-coupling-hub','medium','medium',file,1,`High-dependency module (${fanIn} dependents)`,'Changes affect many consumers; check whether this is an appropriate shared kernel.','Preserve a stable API facade and test callers.'));
     if(fanOut>=12)findings.push(newFinding('excessive-fan-out','medium','medium',file,1,`Broad-coupling module (${fanOut} dependencies)`,'A module imports many systems and may mix responsibilities.','Review layer boundaries before refactoring; composition roots may be valid.'));
   }
-  for(const cycle of components(graph))findings.push(newFinding('circular-dependency','high','high',cycle[0],1,`${cycle.length}-module dependency cycle`,cycle.join(' → '),'Extract shared cohesive definitions or invert the dependency.',cycle));
+  const runtimeCycles = components(eager);
+  const runtimeCycleMembers = new Set(runtimeCycles.map(cycle=>JSON.stringify(cycle)));
+  const typeInvolvedCycles = components(staticDependencies).filter(cycle=>!runtimeCycleMembers.has(JSON.stringify(cycle)));
+  for (const cycle of runtimeCycles) {
+    findings.push(newFinding('circular-dependency','high','high',cycle[0],1,
+      `${cycle.length}-module runtime dependency cycle`,cycle.join(', '),'Inspect initialization order and extract shared definitions or invert the dependency.',cycle));
+  }
+  for (const cycle of typeInvolvedCycles) {
+    findings.push(newFinding('type-dependency-cycle','low','high',cycle[0],1,
+      `${cycle.length}-module cycle involving type dependencies`,cycle.join(', '),'Review contract ownership if these type dependencies make changes harder.',cycle));
+  }
   const entries=new Set(sources.filter(isEntry));
   if(allNames.has('package.json')){
     try {const pkg=JSON.parse(await readFile(path.join(root,'package.json'),'utf8'));const refs=[];for(const key of ['main','module','browser','types'])if(typeof pkg[key]==='string')refs.push(pkg[key]);
       function x(v){if(typeof v==='string')refs.push(v);else if(v&&typeof v==='object')Object.values(v).forEach(x);}x(pkg.exports);
-      for(const ref of refs){const candidate=resolve('root.ts',ref.startsWith('.')?ref:`./${ref}`,sourceSet);if(candidate)entries.add(candidate);}
+      for(const ref of refs){const candidate=resolver.resolve('root.ts',ref.startsWith('.')?ref:`./${ref}`).target;if(candidate)entries.add(candidate);}
     }catch {findings.push(newFinding('invalid-package-json','high','high','package.json',1,'Invalid package.json','Could not parse package manifest.','Correct manifest and rescan.'));}
   }
   if(entries.size){const reached=new Set(),todo=[...entries];for(let i=0;i<todo.length;i++){const f=todo[i];if(reached.has(f))continue;reached.add(f);for(const t of graph.get(f)||[])if(!reached.has(t))todo.push(t);}
@@ -173,9 +216,9 @@ export async function scanLargeDirectory(directory, options={}) {
   }
   findings.sort((a,b)=>({high:0,medium:1,low:2}[a.severity]-{high:0,medium:1,low:2}[b.severity])||a.location.file.localeCompare(b.location.file));
   findings.forEach((f,i)=>f.id=`finding-${i+1}`);
-  const report={schemaVersion:'1.1',generatedAt:new Date().toISOString(),project:name,summary:{sourceFiles:sources.length,totalFiles,importEdges:references.filter(e=>e.to).length,entrypoints:entries.size,parseErrors,findings:findings.length,safeFixCandidates:fixes.length,bySeverity:Object.fromEntries(['high','medium','low'].map(s=>[s,findings.filter(f=>f.severity===s).length])),directFunctionCalls:callEdges.length,functionSymbols:callNodes.filter(n=>n.kind==='function').length,sourceBytesRead:processedBytes,scanDurationMs:Math.round(performance.now()-started)},
+  const report={schemaVersion:'1.2',generatedAt:new Date().toISOString(),project:name,summary:{sourceFiles:sources.length,totalFiles,importEdges:references.filter(e=>e.to).length,entrypoints:entries.size,parseErrors,findings:findings.length,safeFixCandidates:fixes.length,bySeverity:Object.fromEntries(['high','medium','low'].map(s=>[s,findings.filter(f=>f.severity===s).length])),directFunctionCalls:callEdges.length,functionSymbols:callNodes.filter(n=>n.kind==='function').length,sourceBytesRead:processedBytes,scanDurationMs:Math.round(performance.now()-started)},
     limitations:['One-source-file-at-a-time AST scanning: no fixed file count or source byte cap; bounded by disk, memory, execution time and OS constraints.','TypeScript/JavaScript static analysis only. Dynamic calls, framework conventions and reflection are incomplete.','No project code was executed. Runtime speed and correctness cannot be inferred from these signals.','Function symbol names may be shadowed; call graph contains hypotheses, not proof of dead code.','Unused import changes require review and regression checks.'],
-    graph:{nodes:sources,edges:references,entrypoints:[...entries],calls:{kind:'partial-static-call-graph',nodes:callNodes,edges:callEdges,unresolved,limitations:['Direct calls only; unresolved dynamic and member calls are expected.']}},findings,fixes,externalDependencies:[...externals].sort(),agentTask:buildAgentTask(name,findings)};
+    graph:{nodes:sources,edges:references,entrypoints:[...entries],resolution:{configs:Object.fromEntries(resolver.configs),scope:'indexed files and nearest tsconfig.json or jsconfig.json'},cycles:{runtime:runtimeCycles,typeInvolved:typeInvolvedCycles},calls:{kind:'partial-static-call-graph',nodes:callNodes,edges:callEdges,unresolved,limitations:['Direct calls only; unresolved dynamic and member calls are expected.']}},findings,fixes,externalDependencies:[...externals].sort(),agentTask:buildAgentTask(name,findings)};
   report.architecture=analyzeArchitecture(report);
   report.refactorBlueprint=buildRefactorBlueprint(report);
   report.repairPlan=makeRepairPlan(report);

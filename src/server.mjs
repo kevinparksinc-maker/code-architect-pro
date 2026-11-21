@@ -46,6 +46,7 @@ function reportPreview(report) {
   return {...report,findings:report.findings.slice(0,250),fixes:report.fixes.slice(0,100),
     repairPlan:{...report.repairPlan,steps:report.repairPlan.steps.slice(0,100)},
     graph:{...report.graph,nodes:report.graph.nodes.slice(0,250),edges:report.graph.edges.slice(0,300),
+      cycles:{runtime:report.graph.cycles.runtime.slice(0,100),typeInvolved:report.graph.cycles.typeInvolved.slice(0,100)},
       calls:{...report.graph.calls,nodes:report.graph.calls.nodes.slice(0,300),edges:report.graph.calls.edges.slice(0,300),unresolved:report.graph.calls.unresolved.slice(0,50)}},
     refactorBlueprint:{...report.refactorBlueprint,changeSets:report.refactorBlueprint.changeSets.slice(0,100)},
     architecture:{...report.architecture,moduleMetrics:report.architecture.moduleMetrics.slice(0,100),hotspots:report.architecture.hotspots.slice(0,100),prioritizedFindings:report.architecture.prioritizedFindings.slice(0,200)},
@@ -101,7 +102,7 @@ export function createAppServer() {
       // Route by URL pathname so tracking and cache-busting query strings do not break pages or API calls.
       const pathname = new URL(req.url, 'http://localhost').pathname;
       if (req.method === 'GET' && (pathname === '/api/health' || pathname === '/healthz')) {
-        json(res, 200, {status:'ok', version:'0.3.1'}); return;
+        json(res, 200, {status:'ok', version:'0.4.0'}); return;
       }
       if (!authorized(req)) {
         res.writeHead(401, headers({ 'Content-Type': 'application/json; charset=utf-8', 'WWW-Authenticate': 'Basic realm="Code Architect", charset="UTF-8"' }));

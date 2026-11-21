@@ -19,6 +19,7 @@ export function analyzeArchitecture(report) {
       caution: dependents >= 8 ? 'Many callers: use incremental migration and interface tests.' : dependencies >= 12 ? 'Broad coupling: investigate cohesive boundaries.' : null};
   }).sort((a,b) => b.changeImpact - a.changeImpact || a.file.localeCompare(b.file));
   const cycleCount = report.findings.filter(f => f.rule === 'circular-dependency').length;
+  const typeInvolvedCycles = report.findings.filter(f => f.rule === 'type-dependency-cycle').length;
   const duplicates = report.findings.filter(f => f.rule === 'duplicate-function-body').length;
   const unresolved = report.findings.filter(f => f.rule === 'unresolved-local-import').length;
   const maxFanIn = Math.max(0, ...modules.map(m => m.dependents));
@@ -42,7 +43,7 @@ export function analyzeArchitecture(report) {
   ];
   return {
     schemaVersion:'1.0', evidenceType:'static-architecture',
-    measurements:{modules:nodes.size, importEdges:edges.length, cycles:cycleCount, duplicateGroups:duplicates, unresolvedImports:unresolved, maxFanIn, maxFanOut, highChangeImpact, findingsByRule},
+    measurements:{modules:nodes.size, importEdges:edges.length, cycles:cycleCount, typeInvolvedCycles, duplicateGroups:duplicates, unresolvedImports:unresolved, maxFanIn, maxFanOut, highChangeImpact, findingsByRule},
     hotspots:modules.filter(m=>m.dependents>=5||m.dependencies>=8).slice(0,200),
     moduleMetrics:modules,
     prioritizedFindings:ranked,
@@ -60,10 +61,11 @@ export function analyzeArchitecture(report) {
 export function compareArchitecture(before, after) {
   if (!before?.architecture?.measurements || !after?.architecture?.measurements) throw new Error('Both inputs must be Code Architect v0.3 reports with architectural measurements');
   const fields = ['modules','importEdges','cycles','duplicateGroups','unresolvedImports','maxFanIn','maxFanOut','highChangeImpact'];
+  if (before.graph?.cycles && after.graph?.cycles) fields.push('typeInvolvedCycles');
   const metrics = fields.map(name => ({name, before:before.architecture.measurements[name], after:after.architecture.measurements[name], delta:after.architecture.measurements[name]-before.architecture.measurements[name]}));
   return {
     schemaVersion:'1.0', projectBefore:before.project, projectAfter:after.project, metrics,
     changes:{improved:metrics.filter(m=>m.delta<0).map(m=>m.name), worsened:metrics.filter(m=>m.delta>0).map(m=>m.name)},
-    limitations:['A reduction in structural counts is not proof that behavior, runtime performance or reliability improved.','Module count, fan-in and import-edge counts are contextual and may legitimately increase during good refactoring.','Run type checks, regression tests and repeatable application benchmarks in an isolated trusted environment.']
+    limitations:[...(Boolean(before.graph?.cycles)!==Boolean(after.graph?.cycles)?['Scan both snapshots with the same scanner version. Legacy cycle counts combined runtime and type dependencies.']:[]),'A reduction in structural counts is not proof that behavior, runtime performance or reliability improved.','Module count, fan-in and import-edge counts are contextual and may legitimately increase during good refactoring.','Run type checks, regression tests and repeatable application benchmarks in an isolated trusted environment.']
   };
 }

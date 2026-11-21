@@ -1,4 +1,4 @@
-# Code Architect Pro v0.3 — Start Here
+# Code Architect Pro v0.4 — Start Here
 
 Verified on Node.js 22: `npm test` passes 23/23, the server starts, and the built-in demo scan runs end to end.
 

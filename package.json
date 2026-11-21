@@ -1,6 +1,6 @@
 {
   "name": "code-architect-engine",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "private": true,
   "description": "Disk-backed scalable JS/TS code architect: ZIP64/GitHub intake, architectural evidence, refactoring blueprints, reviewable patches, and trusted verification helpers",
   "type": "module",

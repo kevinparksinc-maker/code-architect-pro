@@ -1,3 +1,7 @@
+# Code Architect Pro v0.4
+
+The current release adds TypeScript and JavaScript project alias resolution, explicit type vs. runtime cycle reports, and trusted before/after verification with entry-to-caller wiring evidence and JSON fixtures. The behavior and coverage below describe the v0.3 baseline except where superseded by the current README.
+
 # Verified build status — Code Architect Pro v0.3
 
 ## Tested locally

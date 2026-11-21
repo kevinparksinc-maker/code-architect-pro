@@ -1,4 +1,4 @@
-# Code Architect Pro · v0.3
+# Code Architect Pro · v0.4
 
 A **real, locally runnable JS/TS codebase analysis and architectural repair-planning application**, with ZIP/public GitHub intake and a mobile-friendly browser dashboard. No AI key, subscription, or expired trial is required for static scans.
 
@@ -66,6 +66,33 @@ node scripts/benchmark-trusted.mjs ./original ./candidate --i-trust-both
 ```
 
 Benchmarks only run if your trusted project has a `bench` or `benchmark` npm script; changes to the app are never automatically declared better based on static scanner counts.
+
+### Verify a specific repair
+
+The ZIP, GitHub and CLI scanner resolves aliases from the nearest `tsconfig.json` or `jsconfig.json` and local JSON files it extends. The graph labels eager runtime, explicit type-only and literal lazy imports. Runtime cycles are listed separately from cycles involving type dependencies. Rescan both versions with the same Code Architect release before comparing counts. Custom bundler aliases, project-reference layouts and dynamically computed imports can require further review.
+
+To check a reviewed patch, keep the original and candidate in separate copies with their dependencies available. The existing patch tool applies selected import fixes to a new folder. For other reviewed changes, prepare your candidate in a separate checkout. Use the optional verification plan to state the expected call and outputs:
+
+```json
+{
+  "scripts": ["check"],
+  "outputs": [{"script": "verify:fixture"}],
+  "wiring": [{
+    "entry": "src/main.ts",
+    "caller": "src/route.ts::run",
+    "callee": "src/calculation.ts::calculate",
+    "replaces": "src/route.ts::oldCalculate"
+  }]
+}
+```
+
+```bash
+node scripts/verify-trusted.mjs ./original ./candidate --i-trust-both --plan repair-plan.json
+```
+
+The verifier runs `test`, `build`, and any additional named npm scripts on both copies. Each output script writes one JSON document to the path in `ARCHITECT_VERIFICATION_OUTPUT`. Use the same deterministic fixture inputs in both versions. Objects are compared independently of key order and array order is preserved. The report records pass/fail and output equality without embedding fixture values. The wiring check walks runtime or literal lazy imports from the explicit entry, looks for the direct call from the named caller, and optionally checks for a remaining call to the old target. It reports source lines and the observed path. Static matches cannot attest that a branch ran or resolve every higher-order call.
+
+The planned verifier exits with 0 when all specified checks pass, 1 for an observed regression, 2 for an invalid invocation or execution setup error, and 3 for inconclusive evidence. The scanner's browser routes continue to analyze source as data. Tests and fixture scripts run only from the local trusted verifier.
 
 ## Builder documents
 

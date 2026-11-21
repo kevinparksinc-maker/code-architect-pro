@@ -61,7 +61,9 @@ function render(report) {
   const list = $('graphList'); list.replaceChildren();
   for (const edge of report.graph.edges.slice(0, 80)) {
     const item = el('div', `edge${!edge.to ? ' missing' : ''}`);
-    item.append(label(`${edge.from} → `), el('b', '', edge.to || `(unresolved) ${edge.specifier}`)); list.append(item);
+    item.append(label(`${edge.from} → `), el('b', '', edge.to || `(unresolved) ${edge.specifier}`));
+    if (edge.kind) item.append(label(` · ${edge.kind === 'type' ? 'type-only' : edge.kind}`));
+    list.append(item);
   }
   if (!report.graph.edges.length) list.append(el('p', '', 'No static import links were found.'));
   const calls = report.graph.calls || {nodes:[],edges:[],unresolved:[]};
@@ -74,7 +76,7 @@ function render(report) {
 }
 function showArchitecture(report) {
   const a=report.architecture||{},m=a.measurements||{};
-  $('architectureSummary').textContent=`${m.modules||0} modules · ${m.cycles||0} dependency cycles · ${m.duplicateGroups||0} duplicate function groups · ${m.highChangeImpact||0} high-impact modules. Static structure is not a runtime speed measurement.`;
+  $('architectureSummary').textContent=`${m.modules||0} modules · ${m.cycles||0} ${report.graph?.cycles?'runtime cycles · '+(m.typeInvolvedCycles||0)+' cycles involving types':'dependency cycles'} · ${m.duplicateGroups||0} duplicate function groups · ${m.highChangeImpact||0} high-impact modules. Static structure is not a runtime speed measurement.`;
   const hotspots=$('hotspotList');hotspots.replaceChildren();
   for(const x of (a.hotspots||[]).slice(0,20)){
     const detail=el('details','plan-item');detail.append(el('summary','',`${x.file} · ${x.dependents} callers / ${x.dependencies} imports`));
