@@ -68,7 +68,7 @@ test('tracking query strings do not turn valid page and API routes into 404s',as
   try {
     let r=await fetch(base+'/?utm_source=chatgpt.com');
     assert.equal(r.status,200);
-    assert.match(r.headers.get('content-type'),/text\\/html/);
+    assert.ok(r.headers.get('content-type')?.includes('text/html'));
     r=await fetch(base+'/app.js?v=1');assert.equal(r.status,200);
     r=await fetch(base+'/style.css?v=1');assert.equal(r.status,200);
     r=await fetch(base+'/api/health?ping=1');assert.equal(r.status,200);
