@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createAppServer} from '../src/server.mjs';
-import {assertSecurePublicHost, authorized} from '../src/auth.mjs';
+import {assertSecurePublicHost, authorized, publicAccessEnabled} from '../src/auth.mjs';
 
 const secret='A-really-long-test-password-47';
 test('public server binding fails without a sufficiently strong password',()=>{
@@ -31,5 +31,31 @@ test('private endpoints require authentication, health endpoint remains availabl
   } finally {
     await new Promise(r=>server.close(r));
     for(const [key,value] of [['ARCHITECT_USERNAME',before.u],['ARCHITECT_PASSWORD',before.p],['NODE_ENV',before.mode]]){if(value===undefined)delete process.env[key];else process.env[key]=value;}
+  }
+});
+
+test('public access requires explicit opt-in and does not require sign-in',()=>{
+  assert.equal(publicAccessEnabled({}),false);
+  assert.equal(publicAccessEnabled({ARCHITECT_PUBLIC_ACCESS:'1'}),false);
+  assert.equal(publicAccessEnabled({ARCHITECT_PUBLIC_ACCESS:'true'}),true);
+  assert.doesNotThrow(()=>assertSecurePublicHost('0.0.0.0',{ARCHITECT_PUBLIC_ACCESS:'true'}));
+  assert.equal(authorized({headers:{}},{ARCHITECT_PUBLIC_ACCESS:'true'}),true);
+  assert.equal(authorized({headers:{}},{ARCHITECT_PUBLIC_ACCESS:'true',ARCHITECT_USERNAME:'architect',ARCHITECT_PASSWORD:secret}),true);
+});
+
+test('public access serves homepage and scan endpoint without credentials',async()=>{
+  const prior=process.env.ARCHITECT_PUBLIC_ACCESS;
+  process.env.ARCHITECT_PUBLIC_ACCESS='true';
+  const server=createAppServer();await new Promise(r=>server.listen(0,'127.0.0.1',r));
+  const base=`http://127.0.0.1:${server.address().port}`;
+  try {
+    let r=await fetch(base+'/');assert.equal(r.status,200);
+    assert.equal(r.headers.has('www-authenticate'),false);
+    r=await fetch(base+'/api/demo',{method:'POST'});assert.equal(r.status,200);
+    const data=await r.json();assert.ok(data.scanId);
+  } finally {
+    await new Promise(r=>server.close(r));
+    if(prior===undefined)delete process.env.ARCHITECT_PUBLIC_ACCESS;
+    else process.env.ARCHITECT_PUBLIC_ACCESS=prior;
   }
 });
