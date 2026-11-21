@@ -6,7 +6,14 @@ function constantTimeEqual(a, b) {
   return aa.length===bb.length && timingSafeEqual(aa,bb);
 }
 
+// Explicit opt-in to a public, no-login code scanner.
+// Archive safety budgets and job limits remain in effect.
+export function publicAccessEnabled(env=process.env) {
+  return env.ARCHITECT_PUBLIC_ACCESS === 'true';
+}
+
 export function assertSecurePublicHost(host, env=process.env) {
+  if (publicAccessEnabled(env)) return;
   const local = new Set(['127.0.0.1','::1','localhost']);
   if (local.has(host)) return;
   if (!env.ARCHITECT_USERNAME || !env.ARCHITECT_PASSWORD || env.ARCHITECT_PASSWORD.length < 16) {
@@ -17,6 +24,7 @@ export function assertSecurePublicHost(host, env=process.env) {
 // All application routes require Basic authentication when credentials are configured.
 // A separate unauthenticated health route is handled in the server before this function.
 export function authorized(req, env=process.env) {
+  if (publicAccessEnabled(env)) return true;
   const user=env.ARCHITECT_USERNAME;
   const password=env.ARCHITECT_PASSWORD;
   if (!user && !password && env.HOST !== '0.0.0.0' && env.HOST !== '::' && env.NODE_ENV !== 'production') return true; // explicit local-only developer mode
